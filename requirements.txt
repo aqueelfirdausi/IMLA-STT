@@ -1,29 +1,19 @@
-# Core dependencies for IMLA Voice Agent — Phase 1
-#
-# Install everything at once:
-#   pip install -r requirements.txt
+# STT / LLM
+groq>=1.4.0
 
-# Speech-to-text (Whisper)
-faster-whisper>=1.0.0
+# Audio
+numpy>=2.4.6
+sounddevice>=0.5.5
 
-# Groq API client (LLM)
-groq>=0.9.0
+# GUI
+PySide6>=6.11.1
 
-# Audio recording and playback (no PyAudio needed)
-sounddevice>=0.4.6
-
-# NumPy is used throughout for audio arrays
-numpy>=1.24.0
-
-# Desktop GUI
-customtkinter>=5.2.0
-
-# Global hotkey + key injection (dictate.py) — requires admin on Windows
+# Hotkeys
 keyboard>=0.13.5
 
-# Clipboard read/write (dictate.py)
-pyperclip>=1.8.2
+# Clipboard / text insertion
+pyperclip>=1.11.0
 
-# System-tray icon (dictate.py)
-pystray>=0.19.4
-Pillow>=10.0.0
+# Tray
+pystray>=0.19.5
+Pillow>=12.2.0
