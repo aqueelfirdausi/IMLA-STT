@@ -39,6 +39,7 @@ FRAME_MS     = 1000 // FPS    # 33 ms
 N_POINTS     = 120            # TUNE: horizontal resolution of each wave
 MAX_AMP      = 38             # TUNE: peak wave height in px at full amplitude
 GAUSSIAN_SIG = 0.28           # TUNE: width of the centre-weighted envelope (0–1)
+IDLE_FADE    = 0.15           # static amplitude shown while not recording (no timer)
 
 N_PARTICLES  = 22             # TUNE: number of sparkle dots
 PART_SPEED   = 0.4            # TUNE: particle drift speed (px/frame)
@@ -92,12 +93,12 @@ class WaveformWidget(QWidget):
 
     def _fade_out(self):
         """Paint a few more decaying frames after recording stops."""
-        if self._fade > 0.02:
+        if self._fade > IDLE_FADE + 0.02:
             self._fade *= 0.75
             self._compute_frame()
             QTimer.singleShot(FRAME_MS, self._fade_out)
         else:
-            self._fade = 0.0
+            self._fade = IDLE_FADE
             self._compute_frame()
 
     # ── Pre-computation (called by timer — NOT paintEvent) ────────────────────
@@ -107,7 +108,7 @@ class WaveformWidget(QWidget):
         self._phase += 0.07    # TUNE: phase advance per frame
 
         # Smooth the fade multiplier
-        target_fade = self._amp if self._state.is_recording else 0.0
+        target_fade = self._amp if self._state.is_recording else IDLE_FADE
         self._fade  = self._fade * 0.82 + target_fade * 0.18   # TUNE: smoothing
 
         w = max(1, self.width())
@@ -125,15 +126,15 @@ class WaveformWidget(QWidget):
         # ── Wave layers ───────────────────────────────────────────────────────
         # Wave specs: (freq_mult, phase_offset, amplitude_frac, (stroke_R,G,B,A), fill_alpha_centre)
         wave_specs = [
-            (2.3, 0.0,   1.0,  (0,  218, 200, 200), 55),   # cyan  – lead    # TUNE
-            (3.1, 1.1,   0.70, (40, 130, 255, 165), 38),   # blue  – mid     # TUNE
-            (4.5, 2.4,   0.45, (20,  80, 210, 120), 22),   # dark  – back    # TUNE
+            (2.3, 0.0,   1.0,  C.WAVE_CYAN, 55),   # cyan  – lead    # TUNE
+            (3.1, 1.1,   0.70, C.WAVE_BLUE, 38),   # blue  – mid     # TUNE
+            (4.5, 2.4,   0.45, C.WAVE_DARK, 22),   # dark  – back    # TUNE
         ]
 
         self._paths = []
         self._grads = []
 
-        for freq, p_off, amp_frac, (sr, sg, sb, sa), fill_ac in wave_specs:
+        for freq, p_off, amp_frac, stroke_col, fill_ac in wave_specs:
             # Build point list
             pts: list[QPointF] = []
             for i in range(N_POINTS + 1):
@@ -163,14 +164,14 @@ class WaveformWidget(QWidget):
             # Horizontal gradient for the fill
             grad = QLinearGradient(0, 0, w, 0)
             edge_alpha = max(0, fill_ac // 4)
-            grad.setColorAt(0.0, QColor(0, 100, 200, edge_alpha))
-            grad.setColorAt(0.35, QColor(0, 180, 210, fill_ac // 2))
-            grad.setColorAt(0.5,  QColor(sr, sg, sb, fill_ac))
-            grad.setColorAt(0.65, QColor(0, 180, 210, fill_ac // 2))
-            grad.setColorAt(1.0, QColor(0, 100, 200, edge_alpha))
+            grad.setColorAt(0.0,  QColor(C.WAVE_FILL_E.red(), C.WAVE_FILL_E.green(), C.WAVE_FILL_E.blue(), edge_alpha))
+            grad.setColorAt(0.35, QColor(C.WAVE_FILL_C.red(), C.WAVE_FILL_C.green(), C.WAVE_FILL_C.blue(), fill_ac // 2))
+            grad.setColorAt(0.5,  QColor(stroke_col.red(), stroke_col.green(), stroke_col.blue(), fill_ac))
+            grad.setColorAt(0.65, QColor(C.WAVE_FILL_C.red(), C.WAVE_FILL_C.green(), C.WAVE_FILL_C.blue(), fill_ac // 2))
+            grad.setColorAt(1.0,  QColor(C.WAVE_FILL_E.red(), C.WAVE_FILL_E.green(), C.WAVE_FILL_E.blue(), edge_alpha))
 
             self._paths.append((fill_path, stroke_path))
-            self._grads.append((grad, QColor(sr, sg, sb, sa)))
+            self._grads.append((grad, stroke_col))
 
         # ── Particles ─────────────────────────────────────────────────────────
         for p in self._particles:
