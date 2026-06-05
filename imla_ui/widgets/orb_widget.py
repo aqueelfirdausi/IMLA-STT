@@ -91,7 +91,7 @@ class OrbWidget(QWidget):
         ring_col  = C.RED if status == "error" else C.ORB_RING
 
         # ── ① Outer halo ring ──────────────────────────────────────────────
-        painter.setPen(QPen(QColor(30, 90, 180, 25), 1))   # TUNE
+        painter.setPen(QPen(C.ORB_GLOW, 1))
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawEllipse(QPointF(cx, cy), HALO_R, HALO_R)
 
@@ -103,13 +103,21 @@ class OrbWidget(QWidget):
             painter.setPen(QPen(glow_color, 1))
             painter.drawEllipse(QPointF(cx, cy), r, r)
 
-        # ── ③ Dark fill circle ────────────────────────────────────────────
-        fill_grad = QRadialGradient(cx, cy, FILL_R)
-        fill_grad.setColorAt(0.0, C.ORB_CORE)
-        fill_grad.setColorAt(1.0, C.ORB_EDGE)
+        # ── ③ Fill circle — lit from upper-left for 3D sphere look ──────────
+        fill_grad = QRadialGradient(cx, cy, FILL_R, cx - 18, cy - 18)
+        fill_grad.setColorAt(0.0, QColor(40,  90, 170))   # blue-lit highlight  # TUNE
+        fill_grad.setColorAt(0.4, QColor(15,  25,  60))   # mid navy             # TUNE
+        fill_grad.setColorAt(1.0, QColor( 6,   9,  20))   # deep near-black edge # TUNE
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(fill_grad))
         painter.drawEllipse(QPointF(cx, cy), FILL_R, FILL_R)
+
+        # ── ③b Specular glint (glass-sphere highlight, upper-left) ───────────
+        glint_grad = QRadialGradient(cx - 18, cy - 20, 13)
+        glint_grad.setColorAt(0.0, QColor(180, 210, 255, 75))   # TUNE: alpha
+        glint_grad.setColorAt(1.0, QColor(180, 210, 255,  0))
+        painter.setBrush(QBrush(glint_grad))
+        painter.drawEllipse(QPointF(cx - 18, cy - 20), 13, 13)
 
         # ── ④ Main ring ───────────────────────────────────────────────────
         ring_alpha = 255 if recording else 160    # TUNE: dimmer when idle
