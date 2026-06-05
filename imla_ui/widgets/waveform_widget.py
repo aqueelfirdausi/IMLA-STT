@@ -209,12 +209,15 @@ class WaveformWidget(QWidget):
             painter.setBrush(QBrush(fill_grad))
             painter.drawPath(fill_path)
 
-            # Stroke on top
-            pen = QPen(stroke_color, 1.5)
-            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            painter.setPen(pen)
+            # Three-pass glow stroke: halo → mid → core
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawPath(stroke_path)
+            r, g, b = stroke_color.red(), stroke_color.green(), stroke_color.blue()
+            for width, alpha in ((16, 25), (7, 80), (2, stroke_color.alpha())):
+                pen = QPen(QColor(r, g, b, alpha), width)
+                pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+                painter.setPen(pen)
+                painter.drawPath(stroke_path)
 
         # 3. Sparkle particles
         painter.setPen(Qt.PenStyle.NoPen)

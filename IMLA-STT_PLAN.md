@@ -6,6 +6,25 @@
 
 ---
 
+## UI Polish — Progress & Open Decisions
+
+DONE this session (imla_ui is now the primary app; dictate.py retained as fallback until imla_ui fully replaces it):
+- Fixed: live waveform now reacts to voice (4x amplitude scaling).
+- Polished: idle waveform richer, palette driven from colors.py.
+- Polished: orb now reads as a lit 3D sphere with specular glint (approved — looks good).
+- Polished: waveform strokes now soft glowing bands (improvement, but not yet mockup-level).
+
+OPEN DECISION — the waveform look:
+- Target (mockup): dense feathered "silk thread" waveform — ~40 fine stacked strands bending together, dissolving into glowing particles at the edges. NOT smooth fat sine waves.
+- Two routes to get there:
+  (A) Qt native: rebuild waveform as many fine strands + edge particles. ~70-80% of mockup. Faster.
+  (B) Web canvas via QtWebEngine (already installed): HTML/JS waveform wired to Python amplitude. ~95% of mockup, more faithful glow/particles. Bigger effort, multiple sessions.
+- Decision deferred to a fresh session. Note: the mockup is an AI-generated concept image; exact 1:1 match isn't realistic — bar is "premium and alive."
+
+STILL PENDING (from before): Phase 3 journal mode (record & save entries to dated files), resizable window, retire dictate.py once imla_ui confirmed fully working.
+
+---
+
 ## 0. The Core Mission (the "why")
 
 **The real problem this app solves: existing speech-to-text tools do not transcribe the user's accent accurately.**
