@@ -37,7 +37,7 @@ FPS          = 30
 FRAME_MS     = 1000 // FPS    # 33 ms
 
 N_POINTS     = 120            # TUNE: horizontal resolution of each wave
-MAX_AMP      = 38             # TUNE: peak wave height in px at full amplitude
+MAX_AMP      = 56             # TUNE: peak wave height in px at full amplitude
 GAUSSIAN_SIG = 0.28           # TUNE: width of the centre-weighted envelope (0–1)
 IDLE_FADE    = 0.15           # static amplitude shown while not recording (no timer)
 
@@ -89,7 +89,7 @@ class WaveformWidget(QWidget):
             self._fade_out()
 
     def _on_amplitude(self, amp: float):
-        self._amp = amp   # will be smoothed in _compute_frame
+        self._amp = min(1.0, amp * 4.0)   # match dictate.py's proven scaling
 
     def _fade_out(self):
         """Paint a few more decaying frames after recording stops."""
@@ -105,7 +105,7 @@ class WaveformWidget(QWidget):
 
     def _compute_frame(self):
         """Update all geometry that paintEvent will use.  No QPainter here."""
-        self._phase += 0.07    # TUNE: phase advance per frame
+        self._phase += 0.10    # TUNE: phase advance per frame
 
         # Smooth the fade multiplier
         target_fade = self._amp if self._state.is_recording else IDLE_FADE
@@ -116,8 +116,8 @@ class WaveformWidget(QWidget):
         cy = h / 2.0
 
         # ── Radial background glow ────────────────────────────────────────────
-        bg = QRadialGradient(w / 2.0, cy, w * 0.55)
-        alpha = int(55 * self._fade)     # TUNE
+        bg = QRadialGradient(w / 2.0, cy, w * 0.72)
+        alpha = int(130 * self._fade)    # TUNE
         bg.setColorAt(0.0, QColor(18, 70, 160, alpha))
         bg.setColorAt(0.5, QColor( 8, 30,  90, alpha // 2))
         bg.setColorAt(1.0, QColor( 0,  0,   0, 0))
