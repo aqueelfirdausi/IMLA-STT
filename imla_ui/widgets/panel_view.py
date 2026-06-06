@@ -34,6 +34,15 @@ from imla_ui.colors                 import C
 
 # ── Layout constants ──────────────────────────────────────────────────────────
 ORB_ZONE_H     = 248    # TUNE: height of orb + waveform area
+
+# --- Web waveform amplitude mapping (tune by eye) ---
+# Raw RMS arrives ~0.0002 (silence) to ~0.19 (loud speech peaks).
+# The web waveform only reads as "active" from ~0.30 up, so map the
+# speech band into the visible band. Clamped to [0,1].
+AMP_IN_MIN = 0.02    # below this = treated as silence
+AMP_IN_MAX = 0.18    # at/above this = full output
+AMP_OUT_MIN = 0.25   # output floor when just barely speaking
+AMP_OUT_MAX = 1.0    # output ceiling at loud speech
 TRANSCRIPT_H   = 158    # TUNE: transcript card height
 SIDE_MARGIN    =  16    # TUNE: left/right margin for card + buttons
 
@@ -139,7 +148,14 @@ class _OrbZone(QWidget):
     mic_clicked = Signal()   # forwarded from OrbWidget.clicked
 
     def set_web_amplitude(self, value: float):
-        js = f"ampTarget = {value:.4f}; autoOsc = false;"
+        if value <= AMP_IN_MIN:
+            mapped = 0.0
+        elif value >= AMP_IN_MAX:
+            mapped = AMP_OUT_MAX
+        else:
+            t = (value - AMP_IN_MIN) / (AMP_IN_MAX - AMP_IN_MIN)
+            mapped = AMP_OUT_MIN + t * (AMP_OUT_MAX - AMP_OUT_MIN)
+        js = f"ampTarget = {mapped:.4f}; autoOsc = false;"
         self._waveform.page().runJavaScript(js)
 
     def set_web_idle(self):
