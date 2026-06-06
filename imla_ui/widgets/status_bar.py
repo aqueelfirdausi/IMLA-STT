@@ -12,7 +12,7 @@ in a QHBoxLayout.  No business logic; no state writes.
 """
 from __future__ import annotations
 
-from PySide6.QtCore    import Qt, QRectF, QPointF
+from PySide6.QtCore    import Qt, QRectF, QPointF, Signal
 from PySide6.QtGui     import (QPainter, QPainterPath, QColor, QPen,
                                QBrush, QFont)
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QSizePolicy
@@ -41,6 +41,11 @@ class StatusBar(QWidget):
         self._status_pill    = _StatusPill(state)
         self._connected_pill = _ConnectedPill(state)
         self._timer_pill     = _TimerPill(state)
+
+        # Wire pill click → journal toggle (keeps state logic out of the pill itself)
+        self._status_pill.journal_toggle_clicked.connect(
+            lambda: state.set_journal_mode(not state.journal_mode)
+        )
 
         lay.addWidget(self._status_pill)
         lay.addStretch()
@@ -75,7 +80,9 @@ class _BasePill(QWidget):
 
 
 class _StatusPill(_BasePill):
-    """Left pill: coloured dot + engine status label."""
+    """Left pill: coloured dot + engine status label. Clickable to toggle journal mode."""
+
+    journal_toggle_clicked = Signal()
 
     _STATUS_LABELS = {
         "loading":    "Loading...",
@@ -97,16 +104,31 @@ class _StatusPill(_BasePill):
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
         self._state = state
+        self._hovered = False
         self.setFixedWidth(140)    # TUNE
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         state.engine_status_changed.connect(self.update)
         state.journal_mode_changed.connect(self.update)
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.journal_toggle_clicked.emit()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         w, h = self.width(), self.height()
-        self._paint_pill_bg(painter, w, h, C.BG_PILL_L)
+        bg = C.BG_PILL_L.lighter(115) if self._hovered else C.BG_PILL_L
+        self._paint_pill_bg(painter, w, h, bg)
 
         status = self._state.engine_status
         # Journal mode overrides idle display so the indicator persists across sessions.
