@@ -16,9 +16,12 @@ so the waveform behind it remains visible.
 
 This widget is transparent; MainWindow paints the glass background beneath it.
 """
-from PySide6.QtCore    import Qt, Signal, QPointF
+from pathlib import Path
+
+from PySide6.QtCore    import Qt, Signal, QPointF, QUrl
 from PySide6.QtGui     import QPainter, QColor, QFont, QPen
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from imla_ui.app_state              import AppState
 from imla_ui.widgets.title_bar      import TitleBar
@@ -131,8 +134,10 @@ class _OrbZone(QWidget):
         self._state = state
         self.setAutoFillBackground(False)
 
-        # WaveformWidget — fills the entire zone
-        self._waveform = WaveformWidget(state, self)
+        # QWebEngineView — fills the entire zone, loads the HTML waveform prototype
+        self._waveform = QWebEngineView(self)
+        _html = (Path(__file__).resolve().parents[2] / "prototypes" / "waveform_web.html")
+        self._waveform.load(QUrl.fromLocalFile(str(_html)))
 
         # OrbWidget — centred on top
         self._orb = OrbWidget(state, self)
