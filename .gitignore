@@ -19,6 +19,9 @@ tts/voices/
 # Temp recordings
 recordings/
 
+# Journal entries (personal)
+journal/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db
