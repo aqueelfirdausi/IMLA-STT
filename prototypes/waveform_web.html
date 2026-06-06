@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silk-Thread Waveform Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #06091400;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: rgb(6, 9, 20);
+    font-family: monospace;
+    color: #aaa;
+  }
+  canvas {
+    display: block;
+    border-radius: 12px;
+  }
+  .controls {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+  }
+  input[type=range] {
+    width: 220px;
+    accent-color: rgb(80, 200, 255);
+  }
+  label { color: rgb(80, 200, 255); letter-spacing: 0.05em; }
+  #ampVal { min-width: 36px; text-align: right; color: #ccc; }
+  .hint { margin-top: 10px; font-size: 11px; color: #444; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="controls">
+  <label>amplitude</label>
+  <input type="range" id="slider" min="0" max="1" step="0.01" value="0.18">
+  <span id="ampVal">0.18</span>
+</div>
+<div class="hint">drag slider · auto-oscillates when idle</div>
+
+<script>
+// ── Palette (mirrors colors.py) ──────────────────────────────────────────────
+const C_CYAN      = 'rgba(80,  200, 255, ';   // bright cyan
+const C_MID_BLUE  = 'rgba(40,  90,  170, ';   // mid blue
+const C_DEEP      = 'rgb(6,   9,   20)';       // background deep
+const C_GLOW_CYAN = 'rgba(80,  200, 255, ';
+const C_GLOW_BLUE = 'rgba(60,  140, 220, ';
+
+// ── Canvas setup ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  canvas.width  = Math.min(window.innerWidth * 0.92, 860);
+  canvas.height = 180;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Timing / motion constants (tune these by eye) ────────────────────────────
+const DRIFT_SPEED      = 0.00020;  // wave phase advance per ms — lower = slower drift
+const BREATH_PERIOD_SEC = 5.0;     // seconds for one full idle swell cycle
+const STRAND_VARIATION  = 0.06;    // how differently each strand moves (0 = perfect unison)
+const AMP_EASING        = 0.05;    // lerp factor toward target amplitude each frame
+
+// ── Strand config ────────────────────────────────────────────────────────────
+const NUM_STRANDS  = 42;
+const IDLE_AMP_PX  = 6;        // px swing at amplitude = 0
+const MAX_AMP_PX   = 62;       // px swing at amplitude = 1
+const EDGE_FADE    = 0.22;     // fraction of width that fades to particles
+const PARTICLE_RES = 3;        // sample every N px for particle dots
+
+// Per-strand stable offsets — tighter variation for unified body feel
+const strands = Array.from({ length: NUM_STRANDS }, (_, i) => ({
+  phaseOffset : (i / NUM_STRANDS) * Math.PI * 0.4,                          // tighter phase spread
+  freqMult    : 1.0 - STRAND_VARIATION/2 + (i / (NUM_STRANDS-1)) * STRAND_VARIATION, // near-unison
+  yOffset     : (i - (NUM_STRANDS - 1) / 2),
+  alpha       : 0.08 + 0.55 * Math.pow(Math.sin((i / (NUM_STRANDS - 1)) * Math.PI), 1.4),
+}));
+
+// ── Driver state ─────────────────────────────────────────────────────────────
+let amplitude     = 0.18;   // displayed/eased amplitude
+let ampTarget     = 0.18;   // what amplitude is lerping toward
+let autoOsc       = true;
+let t             = 0;
+
+const slider  = document.getElementById('slider');
+const ampVal  = document.getElementById('ampVal');
+
+slider.addEventListener('input', () => {
+  ampTarget = parseFloat(slider.value);
+  ampVal.textContent = ampTarget.toFixed(2);
+  autoOsc = false;
+});
+slider.addEventListener('pointerup',   () => { autoOsc = true; });
+slider.addEventListener('pointerleave',() => { autoOsc = true; });
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function strandY(strand, x, ampPx, w) {
+  const phase = t * DRIFT_SPEED * strand.freqMult + strand.phaseOffset;
+  const norm  = x / w;
+  const wave1 = Math.sin(norm * Math.PI * 3.2 + phase);
+  const wave2 = Math.sin(norm * Math.PI * 1.7 - phase * 0.6) * 0.38;
+  return (wave1 + wave2) * ampPx;
+}
+
+function edgeAlpha(x, w) {
+  // 0 at edges, 1 in center
+  const t = Math.min(x / (w * EDGE_FADE), (w - x) / (w * EDGE_FADE), 1);
+  return t * t;  // quadratic ease-in
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────────────
+function draw(ts) {
+  t = ts;
+
+  // Auto-oscillate: slow breathing — one swell every BREATH_PERIOD_SEC seconds
+  if (autoOsc) {
+    const breathPhase = (t / 1000) * (Math.PI * 2 / BREATH_PERIOD_SEC);
+    const breath = 0.5 + 0.5 * Math.sin(breathPhase);        // 0→1→0 smoothly
+    ampTarget = 0.10 + 0.18 * breath;                         // swings 0.10–0.28
+    slider.value       = ampTarget.toFixed(3);
+    ampVal.textContent = ampTarget.toFixed(2);
+  }
+
+  // Ease amplitude toward target each frame
+  amplitude += (ampTarget - amplitude) * AMP_EASING;
+
+  const W  = canvas.width;
+  const H  = canvas.height;
+  const cy = H / 2;
+
+  // Stack spread: tighter at idle, opens slightly with amplitude
+  const SPREAD = 2.2 + amplitude * 3.5;   // px between adjacent strands
+
+  // Per-pixel amplitude in px
+  const ampPx = IDLE_AMP_PX + amplitude * (MAX_AMP_PX - IDLE_AMP_PX);
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Background subtle vignette ──
+  const vign = ctx.createRadialGradient(W/2, cy, H*0.1, W/2, cy, W*0.7);
+  vign.addColorStop(0, 'rgba(10,18,40,0.0)');
+  vign.addColorStop(1, 'rgba(4,6,16,0.55)');
+  ctx.fillStyle = vign;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Bloom pass: wide soft glow behind strands ──
+  ctx.save();
+  ctx.shadowBlur  = 0;
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Draw a blurred "ghost" of the central strand for bloom
+  const bloomStrand = strands[Math.floor(NUM_STRANDS / 2)];
+  for (let b = 0; b < 3; b++) {
+    const blurAmt  = 18 + b * 14;
+    const alphaB   = (0.06 - b * 0.015) * (0.3 + amplitude * 0.7);
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 2) {
+      const dy  = strandY(bloomStrand, x, ampPx * 1.1, W);
+      const yy  = cy + dy;
+      x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+    }
+    ctx.strokeStyle = C_GLOW_CYAN + alphaB + ')';
+    ctx.lineWidth   = 8 + b * 6;
+    ctx.shadowColor = C_GLOW_CYAN + '0.9)';
+    ctx.shadowBlur  = blurAmt;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Main strands ──────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.shadowBlur  = 3;
+  ctx.shadowColor = C_GLOW_CYAN + '0.6)';
+
+  for (let si = 0; si < NUM_STRANDS; si++) {
+    const s       = strands[si];
+    const stackDY = (s.yOffset * SPREAD);
+
+    // Color: centre strands cyan, outer strands mid-blue
+    const centerFrac = 1 - Math.abs(s.yOffset) / (NUM_STRANDS / 2);
+    const baseAlpha  = s.alpha * (0.45 + amplitude * 0.55);
+
+    ctx.beginPath();
+    let inParticle = false;
+
+    for (let x = 0; x <= W; x += 1) {
+      const ea = edgeAlpha(x, W);
+      const dy = strandY(s, x, ampPx, W) + stackDY;
+      const yy = cy + dy;
+
+      if (ea > 0.04) {
+        // Solid strand region
+        if (inParticle || x === 0) { ctx.moveTo(x, yy); inParticle = false; }
+        else                        { ctx.lineTo(x, yy); }
+      } else {
+        // Edge dissolve: scatter particles
+        if (Math.random() < ea * 8 && x % PARTICLE_RES === 0) {
+          const dotAlpha = ea * baseAlpha * 1.8 * centerFrac;
+          ctx.fillStyle  = C_CYAN + dotAlpha + ')';
+          ctx.fillRect(x, yy - 0.5, 1.5, 1.5);
+        }
+        inParticle = true;
+      }
+    }
+
+    // Stroke color gradient cyan→blue by stack position
+    const r = Math.round(80  - (1 - centerFrac) * 40);
+    const g = Math.round(200 - (1 - centerFrac) * 110);
+    const b2= Math.round(255 - (1 - centerFrac) * 85);
+    ctx.strokeStyle = `rgba(${r},${g},${b2},${baseAlpha * centerFrac * 0.9 + 0.08})`;
+    ctx.lineWidth   = 0.65 + centerFrac * 0.55;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  // ── Inner bright spine: single crisp center thread ──
+  ctx.save();
+  ctx.shadowColor = C_GLOW_CYAN + '1)';
+  ctx.shadowBlur  = 8;
+  const spine = strands[Math.floor(NUM_STRANDS / 2)];
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 1) {
+    const ea = edgeAlpha(x, W);
+    if (ea < 0.04) continue;
+    const dy = strandY(spine, x, ampPx, W);
+    const yy = cy + dy;
+    x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+  }
+  const spineAlpha = 0.55 + amplitude * 0.45;
+  ctx.strokeStyle = C_GLOW_CYAN + spineAlpha + ')';
+  ctx.lineWidth   = 1.2;
+  ctx.stroke();
+  ctx.restore();
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
