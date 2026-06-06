@@ -81,6 +81,11 @@ class AudioWorker(QThread):
         self._record_fn      = None
         self._insert_fn      = None
         self._cleanup_fn     = None
+        self._journal_fn     = None   # callable → bool; set via set_journal_fn()
+
+    def set_journal_fn(self, fn) -> None:
+        """Set a callable that returns the live journal_mode bool. Call before start()."""
+        self._journal_fn = fn
 
     # ── QThread entry point ───────────────────────────────────────────────────
 
@@ -173,6 +178,13 @@ class AudioWorker(QThread):
                 final_text = self._cleanup_fn(raw_text)
             else:
                 final_text = raw_text
+
+            # Journal mode: save to file instead of pasting into another app.
+            if self._journal_fn is not None and self._journal_fn():
+                from imla_ui import journal
+                journal.save_entry(final_text)
+                self.transcript_ready.emit(final_text)
+                return
 
             # 4. Restore focus to the window the user was typing in BEFORE
             #    pressing the hotkey / clicking the mic button.

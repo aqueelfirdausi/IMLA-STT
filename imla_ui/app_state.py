@@ -25,6 +25,7 @@ class AppState(QObject):
     final_text_changed      = Signal(str)    # full committed transcript so far
     interim_text_changed    = Signal(str)    # current in-progress recognition chunk
     amplitude_changed       = Signal(float)  # 0.0 – 1.0  RMS from the audio worker
+    journal_mode_changed    = Signal(bool)   # True = journal mode on
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,6 +38,7 @@ class AppState(QObject):
         self._final_text      = ""
         self._interim_text    = ""
         self._amplitude       = 0.0
+        self._journal_mode    = False
 
         # ── Elapsed timer (self-contained) ────────────────────────────────────
         self._elapsed_timer = QTimer(self)
@@ -73,6 +75,10 @@ class AppState(QObject):
     def amplitude(self) -> float:
         return self._amplitude
 
+    @property
+    def journal_mode(self) -> bool:
+        return self._journal_mode
+
     # ── Setters ───────────────────────────────────────────────────────────────
 
     def set_mode(self, value: str) -> None:
@@ -102,6 +108,12 @@ class AppState(QObject):
                 self._elapsed_timer.stop()
                 self.set_interim_text("")    # clear dangling interim on stop
             self.is_recording_changed.emit(value)
+
+    def set_journal_mode(self, on: bool) -> None:
+        """Toggle journal mode. When on, transcripts are saved to file instead of pasted."""
+        if self._journal_mode != on:
+            self._journal_mode = on
+            self.journal_mode_changed.emit(on)
 
     def set_amplitude(self, value: float) -> None:
         """Update waveform amplitude.  Clamps to [0.0, 1.0]."""

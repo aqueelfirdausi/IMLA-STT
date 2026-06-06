@@ -72,6 +72,7 @@ class MainWindow(QMainWindow):
         self._state  = AppState(self)
         self._worker = AudioWorker(self)
         self._worker_ready = False   # True once model_ready fires
+        self._worker.set_journal_fn(lambda: self._state.journal_mode)
 
         # ── Stack: panel (0) and pill (1) ─────────────────────────────────────
         self._stack       = QStackedWidget(self)
@@ -168,6 +169,10 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+C"), self).activated.connect(self._on_copy)
         QShortcut(QKeySequence("Ctrl+I"), self).activated.connect(self._on_insert)
         QShortcut(QKeySequence("Ctrl+K"), self).activated.connect(self._on_clear)
+        QShortcut(QKeySequence("Ctrl+J"), self).activated.connect(self._on_toggle_journal)
+
+    def _on_toggle_journal(self):
+        self._state.set_journal_mode(not self._state.journal_mode)
 
     # ── System tray ───────────────────────────────────────────────────────────
 

@@ -83,6 +83,7 @@ class _StatusPill(_BasePill):
         "listening":  "Listening...",
         "processing": "Processing...",
         "error":      "Error",
+        "journal":    "Journal",
     }
     _STATUS_COLORS = {
         "loading":    QColor(90, 110, 155),
@@ -90,6 +91,7 @@ class _StatusPill(_BasePill):
         "listening":  C.GREEN,
         "processing": C.BLUE,
         "error":      C.RED,
+        "journal":    QColor(160, 100, 220),
     }
 
     def __init__(self, state: AppState, parent=None):
@@ -97,6 +99,7 @@ class _StatusPill(_BasePill):
         self._state = state
         self.setFixedWidth(140)    # TUNE
         state.engine_status_changed.connect(self.update)
+        state.journal_mode_changed.connect(self.update)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -106,6 +109,9 @@ class _StatusPill(_BasePill):
         self._paint_pill_bg(painter, w, h, C.BG_PILL_L)
 
         status = self._state.engine_status
+        # Journal mode overrides idle display so the indicator persists across sessions.
+        if self._state.journal_mode and status == "idle":
+            status = "journal"
         dot_c  = self._STATUS_COLORS.get(status, C.GREEN)
         label  = self._STATUS_LABELS.get(status, status.capitalize())
 
