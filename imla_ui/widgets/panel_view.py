@@ -161,13 +161,20 @@ class _OrbZone(QWidget):
     def set_web_idle(self):
         self._waveform.page().runJavaScript("autoOsc = true;")
 
+    def _on_wf_loaded(self, ok: bool):
+        self._wf_loaded = True
+        # Page is now live — resize canvas to match the current real zone width.
+        self._waveform.page().runJavaScript("if (typeof resize === 'function') resize();")
+
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
         self._state = state
         self.setAutoFillBackground(False)
 
         # QWebEngineView — fills the entire zone, loads the HTML waveform prototype
+        self._wf_loaded = False
         self._waveform = QWebEngineView(self)
+        self._waveform.loadFinished.connect(self._on_wf_loaded)
         _html = (Path(__file__).resolve().parents[2] / "prototypes" / "waveform_web.html")
         self._waveform.load(QUrl.fromLocalFile(str(_html)))
 
@@ -184,6 +191,8 @@ class _OrbZone(QWidget):
 
         # Waveform fills zone
         self._waveform.setGeometry(0, 0, w, h)
+        if self._wf_loaded:
+            self._waveform.page().runJavaScript("if (typeof resize === 'function') resize();")
 
         # Orb centred
         ox = (w - ORB_SIZE) // 2
