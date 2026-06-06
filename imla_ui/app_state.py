@@ -121,6 +121,11 @@ class AppState(QObject):
         self._amplitude = clamped
         self.amplitude_changed.emit(clamped)
 
+    def set_final_text(self, text: str) -> None:
+        """Replace the full transcript with an edited version (e.g. user correction in the box)."""
+        self._final_text = text
+        self.final_text_changed.emit(self._final_text)
+
     def append_final_text(self, chunk: str) -> None:
         """
         Append a committed transcript chunk.

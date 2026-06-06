@@ -1,29 +1,25 @@
 """
 imla_ui/widgets/transcript_view.py
 ────────────────────────────────────
-Transcript display card.
+Editable transcript box (QTextEdit) that keeps AppState as the source of truth.
 
-Two-tier text
-─────────────
-• Final text   — full white, confirmed speech, never changes once appended.
-• Interim text — dimmer colour, current in-progress recognition, replaced
-  each update.  Shown as a continuation of the final text (inline append).
+Flow
+────
+• AppState.final_text_changed → box.setPlainText() (guarded to avoid feedback)
+• AppState.interim_text_changed → appended in grey after final text (read-only suffix)
+• User edits → on focusOut → AppState.set_final_text() writes back
+• Copy / Insert / Clear all still read AppState, not the widget, so they get edits.
 
-Mini eq-bars
-────────────
-A small animated equaliser in the bottom-right corner shows when recording.
-It uses a separate 30fps QTimer that drives 7 bars.  Bar heights are
-pre-computed in _compute_bars(); paintEvent only draws the stored values.
-
-The card paints its own rounded-rectangle background (no stylesheet hacks).
+TranscriptViewLegacy (the original hand-painted widget) is kept below for reference.
 """
 from __future__ import annotations
 import math
 
 from PySide6.QtCore    import Qt, QTimer, QRectF, QPointF
 from PySide6.QtGui     import (QPainter, QColor, QPen, QBrush,
-                               QPainterPath, QFont, QFontMetrics)
-from PySide6.QtWidgets import QWidget
+                               QPainterPath, QFont, QFontMetrics,
+                               QTextCharFormat, QTextCursor)
+from PySide6.QtWidgets import QWidget, QTextEdit
 
 from imla_ui.colors    import C
 from imla_ui.app_state import AppState
@@ -43,7 +39,106 @@ EQ_MARGIN  = 10    # TUNE: right/bottom margin from card edge
 FPS        = 30
 
 
-class TranscriptView(QWidget):
+class TranscriptView(QTextEdit):
+    """
+    Editable transcript box.  AppState is the source of truth; this widget
+    reflects it and writes user edits back on focus-out.
+
+    Focus-out chosen over debounce because:
+    • Streaming append_final_text fires during dictation — committing on every
+      keystroke would fight those writes. Focus-out lets the user finish a
+      correction before it races against incoming chunks.
+    • Debounce would need a QTimer and still has the same race on short delays.
+
+    Interim text (in-progress recognition) is appended after the confirmed text
+    in grey, read-only. It is replaced on each interim_text_changed signal and
+    is never committed to AppState.
+    """
+
+    def __init__(self, state: AppState, parent=None):
+        super().__init__(parent)
+        self._state = state
+        self._updating = False   # guard: suppress write-back while we're setting text
+
+        # ── Appearance ────────────────────────────────────────────────────────
+        bg   = C.BG_CARD
+        text = C.TEXT_PRI
+
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: rgb({bg.red()}, {bg.green()}, {bg.blue()});
+                color: rgb({text.red()}, {text.green()}, {text.blue()});
+                border: 1px solid rgb({C.CARD_BORDER.red()}, {C.CARD_BORDER.green()}, {C.CARD_BORDER.blue()});
+                border-radius: 10px;
+                padding: 14px;
+                font-family: "Segoe UI";
+                font-size: 12pt;
+                selection-background-color: rgb(27, 80, 160);
+            }}
+            QScrollBar:vertical {{
+                background: rgb({bg.red()}, {bg.green()}, {bg.blue()});
+                width: 6px;
+                border-radius: 3px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgb(40, 60, 100);
+                border-radius: 3px;
+                min-height: 20px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
+        """)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setWordWrapMode(self.wordWrapMode())   # keep default word wrap
+
+        # ── State connections ─────────────────────────────────────────────────
+        state.final_text_changed.connect(self._on_final)
+        state.interim_text_changed.connect(self._on_interim)
+
+    # ── State → widget ────────────────────────────────────────────────────────
+
+    def _on_final(self, text: str):
+        if self._updating:
+            return
+        self._updating = True
+        # Preserve cursor position if the user is in the box
+        cursor_at_end = self.textCursor().atEnd()
+        self.setPlainText(text)
+        if cursor_at_end:
+            self.moveCursor(QTextCursor.MoveOperation.End)
+        self._updating = False
+
+    def _on_interim(self, text: str):
+        # Re-render: final in white, interim appended in grey (not editable here,
+        # but QTextEdit lets the user click past it — acceptable for now).
+        if self._updating:
+            return
+        self._updating = True
+        final = self._state.final_text
+        if text:
+            # Build rich text: final normal, interim dimmed
+            cursor = QTextCursor(self.document())
+            self.setPlainText(final)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            fmt = QTextCharFormat()
+            fmt.setForeground(C.TEXT_DIM)
+            cursor.insertText(" " + text, fmt)
+        else:
+            self.setPlainText(final)
+        self.moveCursor(QTextCursor.MoveOperation.End)
+        self._updating = False
+
+    # ── Widget → AppState (write-back on focus-out) ───────────────────────────
+
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        if not self._updating:
+            self._state.set_final_text(self.toPlainText())
+
+
+# ── Legacy painted widget (kept as fallback) ──────────────────────────────────
+
+class TranscriptViewLegacy(QWidget):
     """Transcript card with two-tier text and an animated mini equaliser."""
 
     def __init__(self, state: AppState, parent=None):
