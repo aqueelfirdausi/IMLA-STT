@@ -38,6 +38,7 @@ TRANSCRIPT_H   = 158    # TUNE: transcript card height
 SIDE_MARGIN    =  16    # TUNE: left/right margin for card + buttons
 
 
+
 class PanelView(QWidget):
     """
     Full panel.  Transparent background — MainWindow paints the glass rect.
@@ -116,6 +117,14 @@ class PanelView(QWidget):
         self._action_bar.clear_clicked.connect(self.clear_clicked)
         self._orb_zone.mic_clicked.connect(self.mic_clicked)
 
+    # ── Web waveform bridge (passthroughs into _OrbZone) ─────────────────────
+
+    def set_web_amplitude(self, value: float):
+        self._orb_zone.set_web_amplitude(value)
+
+    def set_web_idle(self):
+        self._orb_zone.set_web_idle()
+
 
 # ── Private helper ────────────────────────────────────────────────────────────
 
@@ -128,6 +137,13 @@ class _OrbZone(QWidget):
     """
 
     mic_clicked = Signal()   # forwarded from OrbWidget.clicked
+
+    def set_web_amplitude(self, value: float):
+        js = f"ampTarget = {value:.4f}; autoOsc = false;"
+        self._waveform.page().runJavaScript(js)
+
+    def set_web_idle(self):
+        self._waveform.page().runJavaScript("autoOsc = true;")
 
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)

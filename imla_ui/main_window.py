@@ -131,6 +131,10 @@ class MainWindow(QMainWindow):
         w.status_changed.connect(s.set_engine_status)
         w.recording_changed.connect(s.set_is_recording)
         w.amplitude_ready.connect(s.set_amplitude)
+        w.amplitude_ready.connect(self._panel_view.set_web_amplitude)
+        w.recording_changed.connect(
+            lambda rec: self._panel_view.set_web_idle() if not rec else None
+        )
         w.interim_ready.connect(s.set_interim_text)
         w.transcript_ready.connect(s.append_final_text)
 
