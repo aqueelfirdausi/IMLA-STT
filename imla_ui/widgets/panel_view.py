@@ -211,6 +211,7 @@ class _StatusLabel(QWidget):
         self.setAutoFillBackground(False)
         state.engine_status_changed.connect(self.update)
         state.is_recording_changed.connect(self.update)
+        state.journal_mode_changed.connect(self.update)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -225,7 +226,10 @@ class _StatusLabel(QWidget):
             "listening":  ("Listening...",  C.BLUE),
             "processing": ("Processing...", C.CYAN),
             "error":      ("Error",         C.RED),
+            "journal":    ("Journal",       QColor(160, 100, 220)),
         }
+        if self._state.journal_mode and status == "idle":
+            status = "journal"
         label, color = _STATUS_MAP.get(status, ("Idle", QColor(90, 110, 155)))
 
         # Dot
