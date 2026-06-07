@@ -24,6 +24,7 @@ class TitleBar(QWidget):
     to_pill_clicked  = Signal()   # minimise → pill view
     minimize_clicked = Signal()   # OS minimize (taskbar)
     close_clicked    = Signal()   # quit
+    ask_clicked      = Signal()   # toggle journal chat view
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -54,7 +55,11 @@ class TitleBar(QWidget):
         lay.addWidget(self._name_lbl)
         lay.addStretch()
 
-        # Right: bell, minimise, close
+        # Right: ask-journal, bell, minimise, close
+        self._ask_btn   = _GhostButton("💬")   # speech balloon
+        self._ask_btn.setToolTip("Ask your journal")
+        self._ask_btn.clicked.connect(self.ask_clicked)
+
         self._bell_btn  = _GhostButton("🔔")
         self._bell_btn.setToolTip("Notifications")
 
@@ -73,6 +78,7 @@ class TitleBar(QWidget):
         )
         self._close_btn.clicked.connect(self.close_clicked)
 
+        lay.addWidget(self._ask_btn)
         lay.addWidget(self._bell_btn)
         lay.addSpacing(6)
         lay.addWidget(self._min_btn)

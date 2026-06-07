@@ -20,7 +20,7 @@ from pathlib import Path
 
 from PySide6.QtCore    import Qt, Signal, QPointF, QUrl
 from PySide6.QtGui     import QPainter, QColor, QFont, QPen
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QStackedWidget
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from imla_ui.app_state              import AppState
@@ -28,6 +28,7 @@ from imla_ui.widgets.title_bar      import TitleBar
 from imla_ui.widgets.waveform_widget import WaveformWidget
 from imla_ui.widgets.orb_widget     import OrbWidget, ORB_SIZE
 from imla_ui.widgets.transcript_view import TranscriptView
+from imla_ui.widgets.journal_chat_view import JournalChatView
 from imla_ui.widgets.action_bar     import ActionBar
 from imla_ui.widgets.status_bar     import StatusBar
 from imla_ui.colors                 import C
@@ -92,10 +93,14 @@ class PanelView(QWidget):
         self._orb_zone.setFixedHeight(ORB_ZONE_H)
         root.addWidget(self._orb_zone)
 
-        # 3. Transcript card (with side margins via a wrapper)
+        # 3. Transcript / journal-chat stack (with side margins via a wrapper)
         self._transcript = TranscriptView(self._state, self)
-        self._transcript.setFixedHeight(TRANSCRIPT_H)
-        self._layout_with_margin(root, self._transcript, SIDE_MARGIN)
+        self._journal_chat = JournalChatView(self)
+        self._center_stack = QStackedWidget(self)
+        self._center_stack.addWidget(self._transcript)    # index 0
+        self._center_stack.addWidget(self._journal_chat)  # index 1
+        self._center_stack.setFixedHeight(TRANSCRIPT_H)
+        self._layout_with_margin(root, self._center_stack, SIDE_MARGIN)
 
         # 4. Action bar (with side margins)
         self._action_bar = ActionBar(self)
@@ -121,10 +126,18 @@ class PanelView(QWidget):
         self._title_bar.to_pill_clicked.connect(self.to_pill_clicked)
         self._title_bar.minimize_clicked.connect(self.minimize_clicked)
         self._title_bar.close_clicked.connect(self.close_clicked)
+        self._title_bar.ask_clicked.connect(self._toggle_journal_chat)
         self._action_bar.copy_clicked.connect(self.copy_clicked)
         self._action_bar.insert_clicked.connect(self.insert_clicked)
         self._action_bar.clear_clicked.connect(self.clear_clicked)
         self._orb_zone.mic_clicked.connect(self.mic_clicked)
+
+    # ── Journal chat toggle ───────────────────────────────────────────────────
+
+    def _toggle_journal_chat(self):
+        """Flip the centre slot between the transcript (0) and chat view (1)."""
+        idx = self._center_stack.currentIndex()
+        self._center_stack.setCurrentIndex(0 if idx == 1 else 1)
 
     # ── Web waveform bridge (passthroughs into _OrbZone) ─────────────────────
 
